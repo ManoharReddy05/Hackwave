@@ -1,0 +1,115 @@
+/* ThreadView.css */
+
+/* Container for the thread page */
+.thread-container {
+  max-width: 800px;
+  margin: 20px auto;
+  padding: 0 15px;
+  font-family: Arial, sans-serif;
+}
+
+/* Thread title and author */
+.thread-container h1 {
+  font-size: 2rem;
+  margin-bottom: 5px;
+}
+
+.thread-container p.thread-author {
+  font-size: 0.9rem;
+  color: #555;
+  margin-bottom: 20px;
+}
+
+/* Comments section */
+.comments-section {
+  margin-top: 30px;
+}
+
+.comment {
+  border-left: 2px solid #ddd;
+  padding-left: 15px;
+  margin-bottom: 15px;
+  position: relative;
+}
+
+.comment .collapse-btn {
+  background: none;
+  border: none;
+  color: #0079d3;
+  font-size: 0.8rem;
+  cursor: pointer;
+  margin-bottom: 5px;
+  padding: 0;
+}
+
+.comment .collapse-btn:hover {
+  text-decoration: underline;
+}
+
+.comment-replies {
+  margin-top: 10px;
+}
+
+
+.comment p {
+  margin: 5px 0;
+}
+
+.comment small {
+  color: #777;
+  font-size: 0.8rem;
+}
+
+/* Reply input and button */
+.reply-form {
+  display: flex;
+  margin-top: 5px;
+}
+
+.reply-form input {
+  flex: 1;
+  padding: 5px 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.reply-form button {
+  margin-left: 5px;
+  padding: 5px 10px;
+  background-color: #0079d3;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.reply-form button:hover {
+  background-color: #005999;
+}
+
+/* Add comment form */
+.add-comment-form {
+  display: flex;
+  margin-top: 20px;
+}
+
+.add-comment-form input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+}
+
+.add-comment-form button {
+  margin-left: 5px;
+  padding: 8px 15px;
+  background-color: #0079d3;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.add-comment-form button:hover {
+  background-color: #005999;
+}
