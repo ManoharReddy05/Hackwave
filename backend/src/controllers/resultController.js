@@ -18,15 +18,54 @@ export const submitQuizResult = async (req, res) => {
     const quiz = await Quiz.findById(quizId).populate("questions");
     if (!quiz) return res.status(404).json({ message: "Quiz not found" });
 
+    // Check if quiz is active and published
+    if (!quiz.isActive) {
+      return res.status(403).json({ message: "This quiz is no longer active" });
+    }
+
+    if (!quiz.isPublished) {
+      return res.status(403).json({ message: "This quiz is not yet published" });
+    }
+
     // Verify user is member of the group
     const group = await Group.findById(quiz.group);
     if (!group.members.some(m => m.toString() === req.user._id.toString())) {
       return res.status(403).json({ message: "Must be a group member to take quiz" });
     }
 
+    // Check schedule if quiz is scheduled
+    if (quiz.isScheduled) {
+      const now = new Date();
+      const start = new Date(quiz.scheduledStartTime);
+      const end = new Date(quiz.scheduledEndTime);
+
+      if (now < start) {
+        return res.status(403).json({ 
+          message: "Quiz has not started yet",
+          startTime: quiz.scheduledStartTime
+        });
+      }
+
+      if (now > end) {
+        return res.status(403).json({ 
+          message: "Quiz submission period has ended",
+          endTime: quiz.scheduledEndTime
+        });
+      }
+    }
+
     // Count previous attempts
     const previousResults = await Result.countDocuments({ quiz: quizId, user: req.user._id });
     const attemptNumber = previousResults + 1;
+
+    // Check max attempts limit
+    if (quiz.maxAttempts && previousResults >= quiz.maxAttempts) {
+      return res.status(403).json({ 
+        message: `Maximum attempts (${quiz.maxAttempts}) reached`,
+        attemptsUsed: previousResults,
+        maxAttempts: quiz.maxAttempts
+      });
+    }
 
     // Evaluate answers
     let totalScore = 0;
@@ -68,7 +107,7 @@ export const submitQuizResult = async (req, res) => {
     }
 
     const percentageScore = maxScore > 0 ? (totalScore / maxScore) * 100 : 0;
-    const isPassed = percentageScore >= (group.settings?.passingThreshold || 60);
+    const isPassed = percentageScore >= (quiz.passingScore || 60);
 
     // Create result
     const result = new Result({
@@ -85,6 +124,12 @@ export const submitQuizResult = async (req, res) => {
     });
 
     await result.save();
+
+    // Update quiz statistics
+    quiz.totalAttempts = (quiz.totalAttempts || 0) + 1;
+    const allResults = await Result.find({ quiz: quizId });
+    quiz.averageScore = allResults.reduce((sum, r) => sum + r.percentageScore, 0) / allResults.length;
+    await quiz.save();
 
     // Update leaderboard
     await updateLeaderboard(quiz.group, quizId, req.user._id, totalScore, attemptNumber);

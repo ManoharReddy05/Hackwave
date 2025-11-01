@@ -1,81 +1,87 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
 export default function CreateThread() {
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   const handleSubmit = async e => {
     e.preventDefault();
-    setError(""); // clear any old error
+    setError("");
+    setLoading(true);
 
     try {
-      // Send both title and content to backend
-      await axios.post("/api/threads", { title, content });
-      navigate("/");
+      const token = localStorage.getItem("token");
+      await axios.post("http://localhost:5000/api/threads", 
+        { title, content },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      navigate("/threads");
     } catch (err) {
       console.error("Failed to create thread:", err);
       setError(err.response?.data?.message || "Failed to create thread");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "1rem",
-        maxWidth: "600px",
-        margin: "2rem auto",
-      }}
-    >
-      <h2>Create a New Thread</h2>
+    <div className="page-container">
+      <div className="auth-card" style={{ maxWidth: "800px", margin: "2rem auto" }}>
+        <h2 className="auth-title">Create a New Thread</h2>
+        <p className="auth-subtitle">Start a new discussion topic</p>
 
-      {error && (
-        <div style={{ color: "red", fontWeight: "bold" }}>
-          {error}
-        </div>
-      )}
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
 
-      <input
-        type="text"
-        placeholder="Enter thread title..."
-        value={title}
-        onChange={e => setTitle(e.target.value)}
-        required
-        style={{
-          padding: "0.5rem",
-          fontSize: "1rem",
-        }}
-      />
+        <form onSubmit={handleSubmit} className="auth-form">
+          <div className="form-group">
+            <label htmlFor="title">Thread Title *</label>
+            <input
+              type="text"
+              id="title"
+              placeholder="Enter an engaging title..."
+              value={title}
+              onChange={e => setTitle(e.target.value)}
+              required
+              disabled={loading}
+            />
+          </div>
 
-      <textarea
-        placeholder="Write something about your thread..."
-        value={content}
-        onChange={e => setContent(e.target.value)}
-        rows={6}
-        required
-        style={{
-          padding: "0.5rem",
-          fontSize: "1rem",
-          resize: "vertical",
-        }}
-      />
+          <div className="form-group">
+            <label htmlFor="content">Content *</label>
+            <textarea
+              id="content"
+              placeholder="Share your thoughts, questions, or ideas..."
+              value={content}
+              onChange={e => setContent(e.target.value)}
+              rows={8}
+              required
+              disabled={loading}
+            />
+          </div>
 
-      <button
-        type="submit"
-        style={{
-          padding: "0.6rem 1rem",
-          fontSize: "1rem",
-          cursor: "pointer",
-        }}
-      >
-        Create Thread
-      </button>
-    </form>
+          <div className="modal-actions">
+            <Link to="/threads" className="btn btn-secondary">
+              Cancel
+            </Link>
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={loading}
+            >
+              {loading ? "Creating..." : "Create Thread"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }

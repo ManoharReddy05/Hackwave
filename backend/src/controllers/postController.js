@@ -2,9 +2,14 @@ import Post from "../models/Post.js";
 
 // Add a post or reply
 export const addPost = async (req, res) => {
-  const { threadId, content, author, parentPostId = null } = req.body;
-  const post = await Post.create({ threadId, content, author, parentPostId });
-  res.status(201).json(post);
+  try {
+    const { threadId, content, parentPostId = null } = req.body;
+    const author = req.user.id; // Use the authenticated user's ID
+    const post = await Post.create({ threadId, content, author, parentPostId });
+    res.status(201).json(post);
+  } catch (error) {
+    res.status(500).json({ message: "Error creating post", error });
+  }
 };
 
 // Get posts for a thread

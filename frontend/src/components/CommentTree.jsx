@@ -1,14 +1,14 @@
 import { useState } from "react";
-import axios from "axios";
+import api from "../utils/axios";
 
 export default function CommentTree({ comments, threadId, parentId = null }) {
   const [replying, setReplying] = useState(null);
   const [replyContent, setReplyContent] = useState("");
 
   const handleReply = async (parentId) => {
-    const res = await axios.post("/api/posts", {
+    const res = await api.post("/posts", {
       threadId,
-      parentId,
+      parentPostId: parentId,
       content: replyContent,
     });
     window.location.reload(); 

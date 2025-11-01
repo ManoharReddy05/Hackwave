@@ -1,10 +1,11 @@
 import { useState, useEffect } from "react";
-import { useParams } from "react-router-dom";
-import axios from "axios";
+import { useParams, useNavigate } from "react-router-dom";
+import api from "../utils/axios";
 import "./ThreadView.css";
 
 export default function ThreadView() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const [thread, setThread] = useState(null);
   const [posts, setPosts] = useState([]);
   const [comment, setComment] = useState("");
@@ -24,7 +25,13 @@ export default function ThreadView() {
   };
 
   useEffect(() => {
-    axios.get(`/api/threads/${id}`)
+    // Guard: if no token, redirect to login
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+    api.get(`/threads/${id}`)
       .then(res => {
         setThread(res.data.thread);
         setPosts(res.data.posts);
@@ -36,7 +43,7 @@ export default function ThreadView() {
     e.preventDefault();
     if (!comment.trim()) return;
     try {
-      const res = await axios.post("/api/posts", { threadId: id, content: comment, author: "Anonymous" });
+      const res = await api.post("/posts", { threadId: id, content: comment });
       setPosts([...posts, res.data]);
       setComment("");
     } catch (err) {
@@ -48,7 +55,7 @@ export default function ThreadView() {
     const content = replyContent[parentPostId];
     if (!content?.trim()) return;
     try {
-      const res = await axios.post("/api/posts", { threadId: id, content, parentPostId, author: "Anonymous" });
+      const res = await api.post("/posts", { threadId: id, content, parentPostId });
       const insertReply = (postsArr) => postsArr.map(p => {
         if (p._id === parentPostId) return { ...p, replies: [...(p.replies || []), res.data] };
         if (p.replies) return { ...p, replies: insertReply(p.replies) };
@@ -69,7 +76,9 @@ export default function ThreadView() {
     return postsArr.map(post => (
       <div key={post._id} className="comment" style={{ marginLeft: level * 20 }}>
         <p>{post.content}</p>
-        <small>By {post.author}</small>
+        <small>
+          By {post.author?.username || post.author?.displayName || post.author || "Anonymous"}
+        </small>
 
         {post.replies && post.replies.length > 0 && (
   <button className="collapse-btn" onClick={() => toggleCollapse(post._id)}>
@@ -104,7 +113,9 @@ export default function ThreadView() {
   return (
     <div className="thread-container">
       <h1>{thread.title}</h1>
-      <p className="thread-author">By {thread.author}</p>
+      <p className="thread-author">
+        By {thread.author?.username || thread.author?.displayName || thread.author || "Anonymous"}
+      </p>
       <p className="thread-content">{thread.content}</p>
       <div className="comments-section">
         <h2>Comments</h2>

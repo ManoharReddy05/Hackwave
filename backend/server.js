@@ -15,6 +15,8 @@ import resultRoutes from "./src/routes/resultRoutes.js";
 import leaderboardRoutes from "./src/routes/leaderboardRoutes.js";
 import groupRoutes from "./src/routes/groupRoutes.js";
 import messageRoutes from "./src/routes/messageRoutes.js";
+import playgroundRoutes from "./src/routes/playgroundRoutes.js";
+import dashboardRoutes from "./src/routes/dashboardRoutes.js";
 
 // Threads + Posts (Reddit-style)
 import threadRoutes from "./src/routes/threadRoutes.js";
@@ -35,14 +37,18 @@ connectDB();
 // Auth & User Management
 app.use("/api/auth", authRoutes);
 
+// Dashboard
+app.use("/api/users/dashboard", dashboardRoutes);
+
 // Groups, Messages, and Collaboration
 app.use("/api/groups", groupRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/playground", playgroundRoutes);
 
 // Quizzes, Questions, and Results
-app.use("/api/quiz", quizRoutes);
-app.use("/api/question", questionRoutes);
-app.use("/api/result", resultRoutes);
+app.use("/api/quizzes", quizRoutes);
+app.use("/api/questions", questionRoutes);
+app.use("/api/results", resultRoutes);
 app.use("/api/leaderboard", leaderboardRoutes);
 
 // Threads and Posts (for discussions, forum-like groups)
