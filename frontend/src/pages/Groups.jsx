@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import axios from "axios";
 import { Link, useNavigate } from "react-router-dom";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 export default function Groups() {
   const navigate = useNavigate();
   const [groups, setGroups] = useState([]);
@@ -26,7 +28,7 @@ export default function Groups() {
       const token = localStorage.getItem("token");
       const userId = localStorage.getItem("userId");
       
-      const response = await axios.get("http://localhost:5000/api/groups", {
+      const response = await axios.get(`${BASE_URL}/api/groups`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -52,7 +54,7 @@ export default function Groups() {
     e.preventDefault();
     try {
       const token = localStorage.getItem("token");
-      await axios.post("http://localhost:5000/api/groups", newGroup, {
+      await axios.post(`${BASE_URL}/api/groups`, newGroup, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setShowCreateModal(false);

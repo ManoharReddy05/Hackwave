@@ -10,7 +10,7 @@ const playgroundSchema = new mongoose.Schema(
     },
     canvasUrl: {
       type: String,
-      default: process.env.CANVAS_BASE_URL || "https://mavericks-whiteboard-mvvs1437.onrender.com/boards/",
+      default: process.env.CANVAS_BASE_URL
     },
     boardId: {
       type: String,

@@ -2,6 +2,8 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 export default function Register() {
   const [formData, setFormData] = useState({
     username: "",
@@ -39,7 +41,7 @@ export default function Register() {
     setLoading(true);
 
     try {
-      const response = await axios.post("http://localhost:5000/api/auth/register", {
+      const response = await axios.post(`${BASE_URL}/api/auth/register`, {
         username: formData.username,
         email: formData.email,
         password: formData.password,

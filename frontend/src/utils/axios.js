@@ -1,9 +1,11 @@
 import axios from 'axios';
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000/api',
-  timeout: 10000,
+  baseURL: `${BASE_URL}/api`,
+  timeout: 30000,
 });
 
 // Add request interceptor to automatically include auth token

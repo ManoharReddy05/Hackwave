@@ -7,7 +7,7 @@ export default defineConfig({
   // vite.config.js
 server: {
   proxy: {
-    '/api': 'http://localhost:5000', // backend URL
+    '/api': process.env.VITE_BASE_URL, // backend URL
   }
 }
 

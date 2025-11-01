@@ -2,6 +2,8 @@ import { useState, useEffect } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import axios from "axios";
 
+const BASE_URL = import.meta.env.VITE_BASE_URL;
+
 export default function GroupDiscussions() {
   const { groupId } = useParams();
   const navigate = useNavigate();
@@ -25,13 +27,13 @@ export default function GroupDiscussions() {
       const token = localStorage.getItem("token");
       
       // Fetch group details
-      const groupRes = await axios.get(`http://localhost:5000/api/groups/${groupId}`, {
+      const groupRes = await axios.get(`${BASE_URL}/api/groups/${groupId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setGroup(groupRes.data);
 
       // Fetch threads for this group
-      const threadsRes = await axios.get("http://localhost:5000/api/threads", {
+      const threadsRes = await axios.get(`${BASE_URL}/api/threads`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       
@@ -55,7 +57,7 @@ export default function GroupDiscussions() {
       const token = localStorage.getItem("token");
       const tagsArray = discussionData.tags.split(',').map(t => t.trim()).filter(t => t);
       
-      await axios.post("http://localhost:5000/api/threads", {
+      await axios.post(`${BASE_URL}/api/threads`, {
         title: discussionData.title,
         content: discussionData.content,
         groupId: groupId,
