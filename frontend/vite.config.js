@@ -5,10 +5,15 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   // vite.config.js
-server: {
-  proxy: {
-    '/api': process.env.VITE_BASE_URL, // backend URL
-  }
-}
+  server: {
+    proxy: {
+      // during development, proxy API calls to the backend URL defined in env
+      '/api': {
+        target: process.env.VITE_BASE_URL,
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 
 })
