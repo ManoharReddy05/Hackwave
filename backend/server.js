@@ -27,7 +27,7 @@ const app = express();
 
 // ===== Middleware =====
 app.use(cors({
-  origin: ["http://localhost:5173", "https://hackwave-iota.vercel.app"],
+  origin: ["http://localhost:5173", "https://hackwave-lemon.vercel.app"],
   credentials: true 
 }));
 app.use(express.json());
@@ -65,5 +65,5 @@ app.get("/", (req, res) => {
 });
 
 // ===== Server Start =====
-const PORT = process.env.PORT || 4200;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
