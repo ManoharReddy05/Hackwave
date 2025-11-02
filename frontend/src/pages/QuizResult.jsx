@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import api from "../utils/axios";
+import { getQuizFeedback } from "../utils/aiKnowledgeApi";
 import "./QuizResult.css";
 
 export default function QuizResult() {
@@ -11,6 +12,9 @@ export default function QuizResult() {
   const [questions, setQuestions] = useState([]);
   const [error, setError] = useState("");
   const [showDetailedView, setShowDetailedView] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
 
   useEffect(() => {
     fetchResultData();
@@ -43,39 +47,160 @@ export default function QuizResult() {
 
   const getPerformanceFeedback = () => {
     const percentage = result.percentageScore;
-    
+    let title = "";
+    let message = "";
+    let icon = "";
     if (percentage >= 90) {
-      return {
-        title: "Outstanding Performance! 🎉",
-        message: "You've demonstrated excellent mastery of the material. Keep up the great work!",
-        icon: "🌟"
-      };
+        title= "Outstanding Performance! 🎉",
+        message= "You've demonstrated excellent mastery of the material. Keep up the great work!",
+        icon= "🌟"
     } else if (percentage >= 80) {
-      return {
-        title: "Great Job! 👏",
-        message: "You have a strong understanding of the concepts. Minor improvements can push you to excellence.",
-        icon: "✨"
-      };
+        title= "Great Job! 👏",
+        message= "You have a strong understanding of the concepts. Minor improvements can push you to excellence.",
+        icon= "✨"
     } else if (percentage >= 70) {
-      return {
-        title: "Good Effort! 👍",
-        message: "You're on the right track. Review the areas where you made mistakes to strengthen your knowledge.",
-        icon: "💪"
-      };
+        title= "Good Effort! 👍",
+        message= "You're on the right track. Review the areas where you made mistakes to strengthen your knowledge.",
+        icon= "💪"
     } else if (percentage >= 60) {
-      return {
-        title: "Passed, But Room for Improvement 📚",
-        message: "You passed, but there's significant room for growth. Focus on understanding the core concepts better.",
-        icon: "📖"
-      };
+        title= "Passed, But Room for Improvement 📚",
+        message= "You passed, but there's significant room for growth. Focus on understanding the core concepts better.",
+        icon= "📖"
     } else {
-      return {
-        title: "Need More Practice 🎯",
-        message: "Don't be discouraged! This is an opportunity to identify what you need to work on. Review the material and try again.",
-        icon: "💡"
-      };
+        title= "Need More Practice 🎯",
+        message= "Don't be discouraged! This is an opportunity to identify what you need to work on. Review the material and try again.",
+        icon= "💡"
+    }
+    // Build a simple feedback summary for display (no external calls here)
+    const correctCount = result.answers.filter(a => a.isCorrect).length;
+    const totalCount = result.answers.length;
+    const feedback = `You got ${correctCount} out of ${totalCount} correct.`;
+    return {
+      title,
+      message,
+      icon,
+      feedback
     }
   };
+
+  // Build payload for AI feedback service
+  const buildAiFeedbackPayload = () => {
+    if (!result || !questions.length) return null;
+
+    const correctCount = result.answers.filter(a => a.isCorrect).length;
+    const totalCount = result.answers.length;
+
+    const answers = result.answers.map((answer) => {
+      const q = questions.find(q => q._id === (answer.question?._id || answer.question));
+      if (!q) {
+        return {
+          questionId: answer.question?._id || answer.question,
+          isCorrect: answer.isCorrect,
+        };
+      }
+
+      let correctAnswerText = q.correctAnswer;
+      if (q.questionType === "multiple-choice") {
+        const correctOption = q.options?.find(o => o.isCorrect);
+        correctAnswerText = correctOption?.text ?? correctAnswerText;
+      }
+
+      let selectedAnswerText = answer.selectedOption;
+      if (q.questionType === "multiple-choice" && typeof answer.selectedOption === "number") {
+        selectedAnswerText = q.options?.[answer.selectedOption]?.text ?? String(answer.selectedOption);
+      } else if (typeof answer.selectedOption !== "string") {
+        selectedAnswerText = answer.selectedOption?.toString?.() ?? "";
+      }
+
+      return {
+        questionId: q._id,
+        questionText: q.questionText,
+        questionType: q.questionType,
+        difficulty: q.difficulty,
+        tags: q.tags || [],
+        selectedAnswer: selectedAnswerText,
+        correctAnswer: correctAnswerText,
+        isCorrect: answer.isCorrect,
+        pointsEarned: answer.pointsEarned,
+        points: q.points,
+      };
+    });
+
+    return {
+      quizId,
+      resultId,
+      quizTitle: result.quiz?.title,
+      summary: {
+        percentageScore: result.percentageScore,
+        totalScore: result.totalScore,
+        maxScore: result.maxScore,
+        correctCount,
+        totalCount,
+        timeTaken: result.timeTaken,
+        timeLimit: result.quiz?.timeLimit,
+        passed: result.isPassed,
+        attemptNumber: result.attemptNumber,
+      },
+      answers,
+    };
+  };
+
+  // Call AI feedback service when data is ready
+  useEffect(() => {
+    const run = async () => {
+      if (!result || !questions.length) return;
+      
+      setAiLoading(true);
+      setAiError(null);
+      
+      try {
+        // Build quiz results in the format expected by the API
+        const quizResults = result.answers.map((answer) => {
+          const q = questions.find(q => q._id === (answer.question?._id || answer.question));
+          if (!q) {
+            return {
+              question: "Unknown question",
+              chosen_answer: answer.selectedOption?.toString() || "No answer",
+              correct_answer: answer.isCorrect ? answer.selectedOption?.toString() : "Unknown"
+            };
+          }
+
+          let correctAnswerText = q.correctAnswer;
+          if (q.questionType === "multiple-choice") {
+            const correctOption = q.options?.find(o => o.isCorrect);
+            correctAnswerText = correctOption?.text ?? correctAnswerText;
+          }
+
+          let selectedAnswerText = answer.selectedOption;
+          if (q.questionType === "multiple-choice" && typeof answer.selectedOption === "number") {
+            selectedAnswerText = q.options?.[answer.selectedOption]?.text ?? String(answer.selectedOption);
+          } else if (typeof answer.selectedOption !== "string") {
+            selectedAnswerText = answer.selectedOption?.toString?.() ?? "No answer";
+          }
+
+          return {
+            question: q.questionText,
+            chosen_answer: selectedAnswerText,
+            correct_answer: correctAnswerText
+          };
+        });
+
+        // Call the AI Knowledge API for feedback
+        const response = await getQuizFeedback(quizResults);
+        setAiFeedback(response.feedback);
+      } catch (e) {
+        console.error("AI Feedback error:", e);
+        setAiError(e?.response?.data?.message || e.message || "Failed to fetch AI feedback");
+      } finally {
+        setAiLoading(false);
+      }
+    };
+
+    if (result && questions.length) {
+      run();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resultId, result, questions.length]);
 
   const analyzeWeakPoints = () => {
     if (!result || !questions.length) return null;
@@ -274,8 +399,15 @@ export default function QuizResult() {
       {/* Feedback Section */}
       <div className="feedback-section">
         <div className="feedback-icon">{feedback.icon}</div>
-        <h2>{feedback.title}</h2>
-        <p>{feedback.message}</p>
+        <h2>{feedback.title || "Feedback"}</h2>
+        <p>{feedback.message || "No message available."}</p>
+        {aiLoading && <p>Generating AI-powered feedback…</p>}
+        {!aiLoading && aiError && (
+          <p className="error-message">{aiError}</p>
+        )}
+        {!aiLoading && !aiError && (
+          <p>{aiFeedback || feedback.feedback || "No feedback available."}</p>
+        )}
       </div>
 
       {/* Weak Points Analysis */}

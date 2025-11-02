@@ -160,22 +160,10 @@ export default function Playground() {
             className="sidebar-option-card"
             onClick={() => navigate(`/groups/${groupId}/members`)}
           >
-            <div className="option-icon">👥</div>
+            <div className="option-icon">🎨</div>
             <div className="option-content">
-              <h4>View Members</h4>
-              <p>See all group members</p>
-            </div>
-            <div className="option-arrow">→</div>
-          </button>
-
-          <button
-            className="sidebar-option-card"
-            onClick={() => navigate(`/groups/${groupId}/leaderboard`)}
-          >
-            <div className="option-icon">🏆</div>
-            <div className="option-content">
-              <h4>Leaderboard</h4>
-              <p>View rankings</p>
+              <h4>Users in Canvas</h4>
+              <p>See active collaborators</p>
             </div>
             <div className="option-arrow">→</div>
           </button>

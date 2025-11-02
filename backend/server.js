@@ -5,7 +5,7 @@ dotenv.config(); // Load environment variables FIRST before any other imports
 
 import express from "express";
 import cors from "cors";
-import connectDB from "./src/config.js/db.js";
+import connectDB from "./src/config/db.js";
 
 // --- Route Imports ---
 import authRoutes from "./src/routes/authRoutes.js";
@@ -17,6 +17,7 @@ import groupRoutes from "./src/routes/groupRoutes.js";
 import messageRoutes from "./src/routes/messageRoutes.js";
 import playgroundRoutes from "./src/routes/playgroundRoutes.js";
 import dashboardRoutes from "./src/routes/dashboardRoutes.js";
+import meetRoutes from "./src/routes/meetRoutes.js";
 
 // Threads + Posts (Reddit-style)
 import threadRoutes from "./src/routes/threadRoutes.js";
@@ -58,6 +59,10 @@ app.use("/api/leaderboard", leaderboardRoutes);
 // Threads and Posts (for discussions, forum-like groups)
 app.use("/api/threads", threadRoutes);
 app.use("/api/posts", postRoutes);
+
+// ===== Google Meet Integration =====
+
+app.use("/api/meet", meetRoutes);
 
 // ===== Root Route =====
 app.get("/", (req, res) => {

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link, useLocation } from "react-router-dom";
 import api from "../utils/axios";
+import { uploadFiles, generateQuiz, sendFollowUpQuery } from "../utils/aiKnowledgeApi";
 import GroupThreadList from "../components/GroupThreadList";
+import "./GroupDetail.css";
 
 export default function GroupDetail() {
   const { groupId } = useParams();
@@ -29,6 +31,14 @@ export default function GroupDetail() {
   });
   const [quizzes, setQuizzes] = useState([]);
   const [loadingQuizzes, setLoadingQuizzes] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [summaryResult, setSummaryResult] = useState(null);
+  const [isSummarizing, setIsSummarizing] = useState(false);
+  const [followUpQuestion, setFollowUpQuestion] = useState("");
+  const [followUpAnswer, setFollowUpAnswer] = useState(null);
+  const [isLoadingAnswer, setIsLoadingAnswer] = useState(false);
+  const [conversationHistory, setConversationHistory] = useState([]);
 
   useEffect(() => {
     fetchGroupDetails();
@@ -146,6 +156,171 @@ export default function GroupDetail() {
     }
   };
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file type (PDF, DOC, DOCX, TXT)
+      const allowedTypes = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+      if (!allowedTypes.includes(file.type)) {
+        alert('Please upload a valid file (PDF, DOC, DOCX, or TXT)');
+        return;
+      }
+      // Validate file size (max 10MB)
+      if (file.size > 10 * 1024 * 1024) {
+        alert('File size should not exceed 10MB');
+        return;
+      }
+      setSelectedFile(file);
+      setSummaryResult(null);
+    }
+  };
+
+  const handleRemoveFile = () => {
+    setSelectedFile(null);
+    setUploadProgress(0);
+    setSummaryResult(null);
+  };
+
+  const handleSummarize = async () => {
+    if (!selectedFile) {
+      alert('Please select a file first');
+      return;
+    }
+
+    setIsSummarizing(true);
+    setUploadProgress(0);
+
+    // Simulate upload progress
+    const progressInterval = setInterval(() => {
+      setUploadProgress((prev) => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + 10;
+      });
+    }, 200);
+
+    try {
+      // Call the AI Knowledge API to upload and summarize
+      const response = await uploadFiles([selectedFile]);
+      
+      clearInterval(progressInterval);
+      setUploadProgress(100);
+      
+      // Extract summary for the uploaded file
+      const summary = response.summaries[selectedFile.name];
+      
+      // Extract key points from summary (split by periods or bullet points)
+      const keyPoints = summary
+        .split(/[.!?]\s+/)
+        .filter(point => point.trim().length > 20)
+        .slice(0, 5)
+        .map(point => point.trim());
+      
+      // Estimate word count and page count
+      const wordCount = summary.split(/\s+/).length;
+      const pageCount = Math.ceil(wordCount / 300); // ~300 words per page
+      
+      setSummaryResult({
+        title: selectedFile.name,
+        summary: summary,
+        keyPoints: keyPoints.length > 0 ? keyPoints : [
+          "Document successfully summarized",
+          "Review the summary above for details"
+        ],
+        wordCount: wordCount,
+        pageCount: pageCount,
+      });
+    } catch (err) {
+      clearInterval(progressInterval);
+      console.error("Summarization error:", err);
+      alert(err.response?.data?.message || "Failed to summarize document. Please try again.");
+      setUploadProgress(0);
+    } finally {
+      setIsSummarizing(false);
+    }
+  };
+
+  const handleGenerateQuizFromSummary = async () => {
+    if (!summaryResult) {
+      alert('Please upload and summarize a document first');
+      return;
+    }
+
+    const confirmed = window.confirm(
+      'Generate a quiz with 1 questions based on the uploaded document?'
+    );
+    
+    if (!confirmed) return;
+
+    try {
+      setLoading(true);
+      
+      const response = await generateQuiz(
+        1, // number of questions
+        `Quiz: ${summaryResult.title}`,
+        `Auto-generated quiz based on ${summaryResult.title}`,
+        groupId // associate quiz with this group in backend
+      );
+      
+      if (response.quiz && response.quiz.quizId) {
+        alert('Quiz generated successfully!');
+        // Navigate to the quizzes tab to show the new quiz
+        setActiveTab('quizzes');
+        fetchQuizzes(); // Refresh quiz list
+      } else {
+        alert(response.message || 'Could not generate quiz from the document');
+      }
+    } catch (err) {
+      console.error("Quiz generation error:", err);
+      alert(err.response?.data?.message || 'Failed to generate quiz. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAskFollowUp = async (e) => {
+    e.preventDefault();
+    
+    if (!followUpQuestion.trim()) {
+      alert('Please enter a question');
+      return;
+    }
+
+    if (!summaryResult) {
+      alert('Please upload and summarize a document first');
+      return;
+    }
+
+    setIsLoadingAnswer(true);
+    
+    try {
+      const response = await sendFollowUpQuery(followUpQuestion);
+      
+      const newConversation = {
+        question: followUpQuestion,
+        answer: response.response,
+        timestamp: new Date().toISOString(),
+      };
+      
+      setConversationHistory([...conversationHistory, newConversation]);
+      setFollowUpAnswer(response.response);
+      setFollowUpQuestion('');
+    } catch (err) {
+      console.error("Follow-up question error:", err);
+      alert(err.response?.data?.message || 'Failed to get answer. Please try again.');
+    } finally {
+      setIsLoadingAnswer(false);
+    }
+  };
+
+  const handleClearConversation = () => {
+    setConversationHistory([]);
+    setFollowUpAnswer(null);
+    setFollowUpQuestion('');
+  };
+
   if (loading) {
     return (
       <div className="page-container">
@@ -240,6 +415,12 @@ export default function GroupDetail() {
           onClick={() => setActiveTab("quizzes")}
         >
           Quizzes
+        </button>
+        <button
+          className={`tab-button ${activeTab === "summarizer" ? "active" : ""}`}
+          onClick={() => setActiveTab("summarizer")}
+        >
+          📄 Summarizer
         </button>
       </div>
 
@@ -480,6 +661,426 @@ export default function GroupDetail() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Summarizer Tab */}
+        {activeTab === "summarizer" && (
+          <div className="summarizer-content">
+            <div className="summarizer-header">
+              <h3>📄 Document Summarizer</h3>
+              <p className="summarizer-description">
+                Upload your documents and get AI-powered summaries with key points extracted.
+              </p>
+            </div>
+
+            {!isMember ? (
+              <div className="no-data">
+                <p>You must be a member of this group to use the summarizer.</p>
+                <button onClick={handleJoinGroup} className="btn btn-primary">
+                  Join Group
+                </button>
+              </div>
+            ) : (
+              <div className="summarizer-container">
+                {/* File Upload Section */}
+                <div className="upload-section">
+                  <div className="upload-card">
+                    <div className="upload-icon">📤</div>
+                    <h4>Upload Document</h4>
+                    <p className="upload-hint">
+                      Supported formats: PDF, DOC, DOCX, TXT (Max 10MB)
+                    </p>
+
+                    {!selectedFile ? (
+                      <div className="upload-area">
+                        <input
+                          type="file"
+                          id="fileInput"
+                          accept=".pdf,.doc,.docx,.txt"
+                          onChange={handleFileSelect}
+                          style={{ display: 'none' }}
+                        />
+                        <label htmlFor="fileInput" className="upload-label">
+                          <div className="upload-placeholder">
+                            <span className="upload-placeholder-icon">📁</span>
+                            <span>Click to browse or drag and drop</span>
+                          </div>
+                        </label>
+                      </div>
+                    ) : (
+                      <div className="selected-file-card">
+                        <div className="file-info">
+                          <div className="file-icon">
+                            {selectedFile.type.includes('pdf') ? '📕' : 
+                             selectedFile.type.includes('word') ? '📘' : '📄'}
+                          </div>
+                          <div className="file-details">
+                            <h5 className="file-name">{selectedFile.name}</h5>
+                            <p className="file-size">
+                              {(selectedFile.size / 1024).toFixed(2)} KB
+                            </p>
+                          </div>
+                          <button 
+                            className="remove-file-btn"
+                            onClick={handleRemoveFile}
+                            disabled={isSummarizing}
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        {uploadProgress > 0 && uploadProgress < 100 && (
+                          <div className="upload-progress">
+                            <div className="progress-bar">
+                              <div 
+                                className="progress-fill"
+                                style={{ width: `${uploadProgress}%` }}
+                              ></div>
+                            </div>
+                            <span className="progress-text">{uploadProgress}%</span>
+                          </div>
+                        )}
+
+                        <button 
+                          className="btn btn-primary btn-summarize"
+                          onClick={handleSummarize}
+                          disabled={isSummarizing}
+                        >
+                          {isSummarizing ? (
+                            <>
+                              <span className="spinner-small"></span>
+                              Summarizing...
+                            </>
+                          ) : (
+                            <>
+                              ✨ Generate Summary
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Tips Section */}
+                  <div className="tips-card">
+                    <h4>💡 Tips for Best Results</h4>
+                    <ul className="tips-list">
+                      <li>📄 Upload clear, text-based documents</li>
+                      <li>📏 Longer documents may take more time to process</li>
+                      <li>🎯 The AI will extract key points and main ideas</li>
+                      <li>💾 Save important summaries for future reference</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Summary Results Section */}
+                {summaryResult && (
+                  <>
+                    <div className="summary-results">
+                      <div className="results-header">
+                        <h3>📋 Summary Results</h3>
+                        <div className="result-meta">
+                          <span className="meta-badge">
+                            📄 {summaryResult.pageCount} pages
+                          </span>
+                          <span className="meta-badge">
+                            ✍️ {summaryResult.wordCount} words
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="summary-card">
+                        <div className="summary-header-section">
+                          <span className="summary-icon">📝</span>
+                          <h4>Document: {summaryResult.title}</h4>
+                        </div>
+                        
+                        <div className="summary-text">
+                          <h5>Summary</h5>
+                          <p>{summaryResult.summary}</p>
+                        </div>
+
+                        <div className="key-points-section">
+                          <h5>🎯 Key Points</h5>
+                          <ul className="key-points-list">
+                            {summaryResult.keyPoints.map((point, index) => (
+                              <li key={index}>
+                                <span className="point-number">{index + 1}</span>
+                                <span>{point}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+
+                        <div className="summary-actions">
+                          <button className="btn btn-secondary">
+                            📥 Download Summary
+                          </button>
+                          <button className="btn btn-secondary">
+                            📋 Copy to Clipboard
+                          </button>
+                          <button className="btn btn-primary" onClick={handleRemoveFile}>
+                            ➕ Summarize Another
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Follow-Up Questions Section */}
+                    <div className="followup-section">
+                      <div className="followup-header">
+                        <div className="followup-title-wrapper">
+                          <h3>💭 Ask Follow-Up Questions</h3>
+                          <p className="followup-subtitle">
+                            Get AI-powered answers based on the summarized content
+                          </p>
+                        </div>
+                        {conversationHistory.length > 0 && (
+                          <button 
+                            className="btn btn-secondary btn-small"
+                            onClick={handleClearConversation}
+                          >
+                            🗑️ Clear History
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Conversation History */}
+                      {conversationHistory.length > 0 && (
+                        <div className="conversation-history">
+                          {conversationHistory.map((item, index) => (
+                            <div key={index} className="conversation-item">
+                              <div className="question-bubble">
+                                <div className="bubble-header">
+                                  <span className="bubble-icon">❓</span>
+                                  <span className="bubble-label">Your Question</span>
+                                </div>
+                                <p>{item.question}</p>
+                              </div>
+                              <div className="answer-bubble">
+                                <div className="bubble-header">
+                                  <span className="bubble-icon">🤖</span>
+                                  <span className="bubble-label">AI Answer</span>
+                                </div>
+                                <p>{item.answer}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* Ask Question Form */}
+                      <div className="followup-form-card">
+                        <form onSubmit={handleAskFollowUp} className="followup-form">
+                          <div className="form-group-followup">
+                            <label htmlFor="followUpQuestion">
+                              Ask a question about the document
+                            </label>
+                            <div className="input-with-button">
+                              <textarea
+                                id="followUpQuestion"
+                                value={followUpQuestion}
+                                onChange={(e) => setFollowUpQuestion(e.target.value)}
+                                placeholder="e.g., What are the main concepts discussed? Can you explain the methodology?"
+                                rows="3"
+                                disabled={isLoadingAnswer}
+                                className="followup-textarea"
+                              />
+                              <button 
+                                type="submit"
+                                className="btn btn-primary btn-ask"
+                                disabled={isLoadingAnswer || !followUpQuestion.trim()}
+                              >
+                                {isLoadingAnswer ? (
+                                  <>
+                                    <span className="spinner-small"></span>
+                                    Getting Answer...
+                                  </>
+                                ) : (
+                                  <>
+                                    💬 Ask Question
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        </form>
+
+                        {/* Suggested Questions */}
+                        {conversationHistory.length === 0 && (
+                          <div className="suggested-questions">
+                            <h5>💡 Suggested Questions:</h5>
+                            <div className="suggestion-chips">
+                              <button 
+                                className="suggestion-chip"
+                                onClick={() => setFollowUpQuestion("What are the main topics covered in this document?")}
+                                disabled={isLoadingAnswer}
+                              >
+                                What are the main topics?
+                              </button>
+                              <button 
+                                className="suggestion-chip"
+                                onClick={() => setFollowUpQuestion("Can you explain the key concepts in simpler terms?")}
+                                disabled={isLoadingAnswer}
+                              >
+                                Explain key concepts
+                              </button>
+                              <button 
+                                className="suggestion-chip"
+                                onClick={() => setFollowUpQuestion("What are the practical applications mentioned?")}
+                                disabled={isLoadingAnswer}
+                              >
+                                Practical applications
+                              </button>
+                              <button 
+                                className="suggestion-chip"
+                                onClick={() => setFollowUpQuestion("What should I focus on for better understanding?")}
+                                disabled={isLoadingAnswer}
+                              >
+                                What to focus on?
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="followup-tip">
+                        <span className="tip-icon">💡</span>
+                        <p>
+                          Ask specific questions to get detailed answers about the document content
+                        </p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* History Section (Placeholder) */}
+                {!summaryResult && selectedFile === null && (
+                  <div className="history-section">
+                    <h4>📚 Recent Summaries</h4>
+                    <div className="no-data">
+                      <p>No summaries yet. Upload a document to get started!</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Create Quiz Section */}
+                <div className="create-quiz-section">
+                  <div className="create-quiz-card">
+                    <div className="create-quiz-content">
+                      <div className="quiz-icon-large">📝</div>
+                      <div className="quiz-text">
+                        <h4>Generate Quiz from Summary</h4>
+                        <p>Create an AI-powered quiz based on the document summary to test understanding</p>
+                      </div>
+                    </div>
+                    <button 
+                      className="btn btn-primary btn-create-quiz"
+                      onClick={handleGenerateQuizFromSummary}
+                      disabled={!summaryResult}
+                    >
+                      ➕ Create Quiz
+                    </button>
+                  </div>
+                </div>
+
+                {/* Get Feedback Section */}
+                <div className="feedback-section">
+                  <div className="feedback-header">
+                    <div className="feedback-title-wrapper">
+                      <h3>💬 Get Feedback on Quiz Results</h3>
+                      <p className="feedback-subtitle">Review your performance and get personalized insights</p>
+                    </div>
+                  </div>
+
+                  <div className="feedback-content">
+                    <div className="feedback-card">
+                      <div className="feedback-card-header">
+                        <div className="feedback-icon-wrapper">
+                          <span className="feedback-icon">📊</span>
+                        </div>
+                        <div className="feedback-info">
+                          <h4>Performance Analysis</h4>
+                          <p>Get detailed breakdown of your quiz performance</p>
+                        </div>
+                      </div>
+                      <div className="feedback-stats">
+                        <div className="feedback-stat-item">
+                          <span className="stat-icon">✅</span>
+                          <div className="stat-content">
+                            <span className="stat-label">Accuracy</span>
+                            <span className="stat-placeholder">--</span>
+                          </div>
+                        </div>
+                        <div className="feedback-stat-item">
+                          <span className="stat-icon">⏱️</span>
+                          <div className="stat-content">
+                            <span className="stat-label">Time Taken</span>
+                            <span className="stat-placeholder">--</span>
+                          </div>
+                        </div>
+                        <div className="feedback-stat-item">
+                          <span className="stat-icon">🎯</span>
+                          <div className="stat-content">
+                            <span className="stat-label">Score</span>
+                            <span className="stat-placeholder">--</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="feedback-card">
+                      <div className="feedback-card-header">
+                        <div className="feedback-icon-wrapper">
+                          <span className="feedback-icon">🤖</span>
+                        </div>
+                        <div className="feedback-info">
+                          <h4>AI-Powered Insights</h4>
+                          <p>Get personalized recommendations to improve</p>
+                        </div>
+                      </div>
+                      <div className="feedback-insights">
+                        <div className="insight-item">
+                          <span className="insight-badge">💡 Tip</span>
+                          <p>Take quizzes after reviewing the summary for better retention</p>
+                        </div>
+                        <div className="insight-item">
+                          <span className="insight-badge">📈 Improvement</span>
+                          <p>Focus on areas where you scored below 70%</p>
+                        </div>
+                        <div className="insight-item">
+                          <span className="insight-badge">🎓 Strength</span>
+                          <p>You excel in conceptual understanding questions</p>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="feedback-card">
+                      <div className="feedback-card-header">
+                        <div className="feedback-icon-wrapper">
+                          <span className="feedback-icon">📝</span>
+                        </div>
+                        <div className="feedback-info">
+                          <h4>Detailed Question Review</h4>
+                          <p>See which questions you got right or wrong</p>
+                        </div>
+                      </div>
+                      <div className="feedback-cta">
+                        <button className="btn btn-primary btn-full">
+                          View Detailed Feedback
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="feedback-note">
+                    <span className="note-icon">ℹ️</span>
+                    <p>Complete a quiz to see your personalized feedback and insights</p>
+                  </div>
+                </div>
               </div>
             )}
           </div>
