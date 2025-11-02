@@ -8,7 +8,7 @@ export default function Home() {
       {/* Hero Section */}
       <section className="hero-section">
         <div className="hero-content">
-          <h1 className="hero-title">Welcome to SmartQuiz Platform</h1>
+          <h1 className="hero-title">Welcome to KnowledgeKnest</h1>
           <p className="hero-subtitle">
             Collaborate, Learn, and Grow Together
           </p>

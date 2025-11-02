@@ -66,7 +66,7 @@ app.use("/api/meet", meetRoutes);
 
 // ===== Root Route =====
 app.get("/", (req, res) => {
-  res.send("Unified Smart Quiz + Threads Backend is Running");
+  res.send("KnowledgeKnest is Running");
 });
 
 // ===== Server Start =====

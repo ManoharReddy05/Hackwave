@@ -124,7 +124,7 @@ export default function Users() {
 
       {/* Why Choose Us */}
       <section className="about-section">
-        <h2 className="section-title">Why Choose SmartQuiz?</h2>
+        <h2 className="section-title">Why Choose KnowledgeKnest?</h2>
         <div className="benefits-grid">
           <div className="benefit-item">
             <span className="benefit-icon">✓</span>
